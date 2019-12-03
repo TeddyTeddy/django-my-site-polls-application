@@ -21,9 +21,11 @@ class IndexView(generic.ListView):
     def get_queryset(self):
         """ Return the last five published questions (not including those set to be
         published in the future"""
-        return Question.objects.filter(
-            pub_date__lte=timezone.now()
-        ).order_by('-pub_date')[:5]
+        query_set = Question.objects.filter(pub_date__lte=timezone.now())
+        for q in query_set:
+            if not q.choice_set.all():  # if the question does not have any choices
+                query_set = query_set.exclude(pk=q.id)
+        return query_set.order_by('-pub_date')[:5]
 
 # def detail(request, question_id):
 #     question = get_object_or_404(Question, pk=question_id)
