@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.utils import timezone
 from django.urls import reverse
 
-from .models import Question
+from .models import Question, Choice
 
 
 class QuestionModelTests(TestCase):
@@ -122,15 +122,30 @@ class QuestionDetailViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
-    def test_past_question(self):
+    def test_past_question_with_no_choices(self):
         """
-        The detail view of a question with a pub_date in the past
-        displays the question's text.
+        The detail view of a question with a pub_date in the past and without any choices
+        returns a 404 not found
         """
-        past_question = create_question(question_text='Past Question.', days=-5)
+        past_question = create_question(question_text='Past Question with no choices.', days=-5)
         url = reverse('polls:detail', args=(past_question.id,))
         response = self.client.get(url)
-        self.assertContains(response, past_question.question_text)
+        self.assertEqual(response.status_code, 404)
+
+    def test_past_question_with_choices(self):
+        """
+        The detail view of a question with a pub_date in the past and with choices returns
+        the question.question_text in the response body
+        """
+        past_question_with_choices = create_question(question_text='Past Question with 2 choices.', days=-5)
+        choice1 = Choice(question=past_question_with_choices, choice_text='Choice 1', votes=0)
+        choice1.save()
+        choice2 = Choice(question=past_question_with_choices, choice_text='Choice 2', votes=0)
+        choice2.save()
+        url = reverse('polls:detail', args=(past_question_with_choices.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Past Question with 2 choices.')
 
 
 class QuestionResultsViewTests(TestCase):
