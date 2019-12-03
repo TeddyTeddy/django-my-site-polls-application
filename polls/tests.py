@@ -143,7 +143,7 @@ class QuestionIndexViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'No polls are available.')
-        
+
 
 class QuestionDetailViewTests(TestCase):
     def test_future_question(self):
