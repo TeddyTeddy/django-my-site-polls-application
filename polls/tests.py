@@ -238,3 +238,80 @@ class QuestionResultsViewTests(TestCase):
         url = reverse('polls:results', args=(past_question.id,))
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+
+def create_question_with_choices(question_text, days):
+    question = create_question(question_text=question_text, days=days)
+    choice_1 = Choice(question=question, choice_text='Choice 1', votes=0)
+    choice_1.save()
+    choice_2 = Choice(question=question, choice_text='Choice 2', votes=0)
+    choice_2.save()
+    choice_3 = Choice(question=question, choice_text='Choice 3', votes=0)
+    choice_3.save()
+    return question, choice_2.id
+
+
+class QuestionVoteViewTests(TestCase):
+    def test_question_id_not_found(self):
+        """
+        To test, when an invalid question id is passed as question_id to the view, the view returns 404
+        """
+        # empty database
+        invalid_question_id = 10000
+        url = reverse('polls:vote', args=(invalid_question_id,))
+        response = self.client.post(url, {'choice': 10})
+        self.assertEqual(response.status_code, 404)
+
+    def test_future_question_with_choices(self):
+        """
+        When a future question's id is passed to the view, the view returns 404.
+        Note that future question has choices
+        """
+        future_question_with_choices, choice_id = create_question_with_choices(question_text='Future question', days=30)
+        url = reverse('polls:vote', args=(future_question_with_choices.id,))
+        response = self.client.post(url, {'choice': choice_id})
+        self.assertEqual(response.status_code, 404)
+
+    def test_voting_with_no_choice_provided(self):
+        """
+        A past question has choices. When a POST request is made to the view with the URL (i.e. /polls/5/vote/)
+        we do NOT provide a choice_id in the request body (i.e. there is no choice=10 in the request body).
+        We expect that view returns 400 status code.
+        """
+        past_question_with_choices, choice_id = create_question_with_choices(question_text='Past question', days=-30)
+        url = reverse('polls:vote', args=(past_question_with_choices.id,))
+        response = self.client.post(url)  # note that we do not provide {'choice':choice_id} in the POST request
+        self.assertEqual(response.status_code, 400)
+
+    def test_voting_with_non_existing_choice_id(self):
+        """
+        A past question has Choices. When a POST request is made to the view with a valid URL (i.e. /polls/5/vote/)
+        and we do provide an non-existing choice_id in the request body (i.e. choice=10000 in the request body).
+        We expect that view returns 200 status code. Note that in the response body should exist the request URL
+        and there has to be 'Vote' button in the response body
+        """
+        past_question_with_choices, choice_id = create_question_with_choices(question_text='Past question', days=-30)
+        url = reverse('polls:vote', args=(past_question_with_choices.id,))
+        response = self.client.post(url, {'choice': 10000})  # note that there is no Choice with an id 10000
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, url)
+        self.assertContains(response, 'Vote')
+
+    def test_past_question_with_choices(self):
+        """
+        A past question has choices. We select a choice with choice_id to be voted for.
+        When a POST request is made to the view with URL (i.e. /polls/5/vote), we also pass the choice_id
+        in the request body (i.e. choice=10). We expect the view to answer us with 302 (Redirect) with a
+        URL (i.e. /polls/5/results). We make a new GET request with the provided url and check that
+        the status code is 200 and the response contains question_text in its body
+        """
+        past_question_with_choices, choice_id = create_question_with_choices(question_text='Past question', days=-30)
+        url = reverse('polls:vote', args=(past_question_with_choices.id,))
+        response = self.client.post(url, {'choice': choice_id})
+        self.assertEqual(response.status_code, 302)
+
+        response = self.client.get(response.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, past_question_with_choices.question_text)
+
+

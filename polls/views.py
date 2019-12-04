@@ -3,6 +3,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.views import generic
 from django.utils import timezone
+from django.http import Http404, HttpResponseBadRequest
 
 from .models import Choice, Question
 
@@ -70,22 +71,29 @@ class ResultsView(generic.DetailView):
 
 def vote(request, question_id):
     question = get_object_or_404(Question, pk=question_id)
-    try:
-        selected_choice = question.choice_set.get(pk=request.POST['choice'])
-    except KeyError:  # ??? except (KeyError, Choice.DoesNotExist):
-        # Redisplay the question voting form
-        return render(request, 'polls/detail.html', {
-            'question': question,
-            'error_message': "You didn't select a choice",
-        })
-    else:
-        selected_choice.votes += 1
-        selected_choice.save()  # TODO: if many users attempt this at the same time, there is a race condition
-        # Always return an HttpResponseRedirect after successfully dealing
-        # with POST data. This prevents data from being posted twice if a
-        # user hits the Back button
-        # This returns 302 - Found redirect message back to client
-        return HttpResponseRedirect(reverse('polls:results', args=(question.id,)))
+    if timezone.now() < question.pub_date:  # the question is published in the future, you can't vote on it
+        raise Http404('Poll will be published in the future; it cant be voted now')
 
+    # at this point, we got a past question
+    if 'choice' in request.POST and request.POST['choice'].isdigit():
+        try:
+            choice_id = int(request.POST['choice'])
+            selected_choice = question.choice_set.get(pk=choice_id)
+        except (KeyError, Choice.DoesNotExist):
+            # Redisplay the question voting form
+            return render(request, 'polls/detail.html', {
+                'question': question,
+                'error_message': "You didn't select a choice with a valid id",
+            })  # returns 200
+        else:
+            selected_choice.votes += 1
+            selected_choice.save()  # TODO: if many users attempt this at the same time, there is a race condition
+            # Always return an HttpResponseRedirect after successfully dealing
+            # with POST data. This prevents data from being posted twice if a
+            # user hits the Back button
+            # This returns 302 - Found redirect message back to client
+            return HttpResponseRedirect(reverse('polls:results', args=(question.id,)))
+    else:  # post request body does not have a choice id or the provided 'choice' value contains non-digit chars
+        return HttpResponseBadRequest()  # return 400 status code
 
 
