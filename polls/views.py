@@ -61,7 +61,11 @@ class ResultsView(generic.DetailView):
         """
         Excludes any questions that are not published yet
         """
-        return Question.objects.filter(pub_date__lte=timezone.now())
+        query_set = Question.objects.filter(pub_date__lte=timezone.now())
+        for q in query_set:
+            if not q.choice_set.all():  # if there are no choices in the question
+                query_set = query_set.exclude(pk=q.id)
+        return query_set
 
 
 def vote(request, question_id):

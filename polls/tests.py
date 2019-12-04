@@ -183,22 +183,58 @@ class QuestionDetailViewTests(TestCase):
 
 
 class QuestionResultsViewTests(TestCase):
-    def test_future_question(self):
+    def test_future_question_with_a_choice(self):
         """
-        The result view of a question with a pub_date in the future
+        The result view of a question with a pub_date in the future and with a choice
         returns a 404 not found.
         """
         future_question = create_question(question_text='Future question.', days=5)
+        choice = Choice(question=future_question, choice_text='Choice', votes=0)
+        choice.save()
+
         url = reverse('polls:results', args=(future_question.id,))
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
 
-    def test_past_question(self):
+    def test_past_question_with_a_choice(self):
         """
-        The results view of a question with a pub_date in the past
-        displays the question's text.
+        The results view of a question with a pub_date in the past and with a choice
+        displays the question's text and gets 200 status code
+        """
+        past_question = create_question(question_text='Past Question.', days=-5)
+        choice = Choice(question=past_question, choice_text='Choice', votes=0)
+        choice.save()
+
+        url = reverse('polls:results', args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, past_question.question_text)
+
+    def test_future_and_past_question_both_with_a_choice(self):
+        """
+        The results view of two questions: Future question with a pub_date in the future
+        and past question with a pub_date in the past. Both questions have a Choice.
+        The view returns 200; in the response content there is past question's text
+        """
+        future_question = create_question(question_text='Future question.', days=5)
+        choice = Choice(question=future_question, choice_text='Choice', votes=0)
+        choice.save()
+
+        past_question = create_question(question_text='Past Question.', days=-5)
+        choice = Choice(question=past_question, choice_text='Choice', votes=0)
+        choice.save()
+
+        url = reverse('polls:results', args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, past_question.question_text)
+
+    def test_past_question_without_a_choice(self):
+        """
+        The results view of a question with a pub_date in the past and WITHOUT a choice
+        gets 404 status code.
         """
         past_question = create_question(question_text='Past Question.', days=-5)
         url = reverse('polls:results', args=(past_question.id,))
         response = self.client.get(url)
-        self.assertContains(response, past_question.question_text)
+        self.assertEqual(response.status_code, 404)
